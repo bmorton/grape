@@ -617,4 +617,51 @@ describe Grape::API do
       last_response.status.should eql 403
     end
   end
+  
+  describe '.before' do
+    it 'should be run before every endpoint call' do
+      subject.before do
+        error!('Stop!', 403)
+      end
+      
+      subject.get '/before' do
+        'Hello, world!'
+      end
+      
+      get '/before'
+      last_response.body.should_not eql 'Hello, world!'
+      last_response.body.should eql 'Stop!'
+      last_response.status.should eql 403
+    end
+    
+    it 'should share instance variables with the route block' do
+      subject.before do
+        @second_word = 'world'
+      end
+      
+      subject.get '/before' do
+        "Hello, #{@second_word}!"
+      end
+      
+      get '/before'
+      last_response.body.should eql 'Hello, world!'
+    end
+    
+    it 'should allow multiple method calls' do
+      subject.before do
+        @first_word = 'Hello'
+      end
+      
+      subject.before do
+        @second_word = 'world'
+      end
+      
+      subject.get '/before' do
+        "#{@first_word}, #{@second_word}!"
+      end
+      
+      get '/before'
+      last_response.body.should eql 'Hello, world!'
+    end
+  end
 end
