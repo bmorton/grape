@@ -17,6 +17,7 @@ module Grape
     
     class << self
       attr_accessor :block
+      attr_accessor :before
     end
     
     def self.call(env)
@@ -79,6 +80,9 @@ module Grape
       @header = {}
       @request = Rack::Request.new(@env)
       
+      self.class.before.each do |block|
+        instance_eval &block
+      end
       response_text = instance_eval &self.class.block
       
       [status, header, [response_text]]

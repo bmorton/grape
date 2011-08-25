@@ -138,6 +138,30 @@ module Grape
         end
       end
       
+      # Add before methods that will be executed in any 
+      # endpoint call, immediately before the passed in
+      # block.
+      #
+      # @example Define some helpers.
+      #     class ExampleAPI < Grape::API
+      #       before do
+      #         User.find_by_id(params[:token])
+      #       end
+      #     end
+      def before(&block)
+        if block_given?
+          m = settings_stack.last[:before] || Array.new
+          m << block
+          set(:before, m)
+        else
+          before_combined = []
+          settings_stack.each do |s|
+            before_combined = s[:before] if s[:before]
+          end
+          before_combined
+        end
+      end
+      
       # Add an authentication type to the API. Currently
       # only `:http_basic`, `:http_digest` and `:oauth2` are supported.
       def auth(type = nil, options = {}, &block)
@@ -159,7 +183,7 @@ module Grape
 
       def http_digest(options = {}, &block)
         options[:realm] ||= "API Authorization"
-	options[:opaque] ||= "secret"
+        options[:opaque] ||= "secret"
         auth :http_digest, options, &block
       end
       
@@ -264,13 +288,14 @@ module Grape
           :format => settings[:error_format] || :txt, 
           :rescue_options => settings[:rescue_options]
         b.use Rack::Auth::Basic, settings[:auth][:realm], &settings[:auth][:proc] if settings[:auth] && settings[:auth][:type] == :http_basic
-	b.use Rack::Auth::Digest::MD5, settings[:auth][:realm], settings[:auth][:opaque], &settings[:auth][:proc] if settings[:auth] && settings[:auth][:type] == :http_digest
+        b.use Rack::Auth::Digest::MD5, settings[:auth][:realm], settings[:auth][:opaque], &settings[:auth][:proc] if settings[:auth] && settings[:auth][:type] == :http_digest
         b.use Grape::Middleware::Prefixer, :prefix => prefix if prefix        
         b.use Grape::Middleware::Versioner, :versions => (version if version.is_a?(Array)) if version
         b.use Grape::Middleware::Formatter, :default_format => default_format || :json
         middleware.each{|m| b.use *m }
 
         endpoint = Grape::Endpoint.generate(&block)
+        endpoint.before = before
         endpoint.send :include, helpers
         b.run endpoint
         
